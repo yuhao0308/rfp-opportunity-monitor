@@ -1,0 +1,26 @@
+[monitor]
+keyword_path = "config/keywords.json"
+state_path = "var/rfp-monitor.sqlite3"
+headless = true
+max_pages = 50
+navigation_timeout_seconds = 45
+
+[notifications]
+recipients = []
+subject_prefix = "[RFP Monitor]"
+timezone = "America/New_York"
+
+[[sources]]
+id = "north-dakota"
+name = "North Dakota Buys"
+state = "ND"
+url = "https://public.ndbuys.nd.gov/page.aspx/en/rfp/request_browse_public"
+enabled = true
+
+[[sources]]
+id = "maryland"
+name = "Maryland eMMA"
+state = "MD"
+url = "https://emma.maryland.gov/page.aspx/en/rfp/request_browse_public?historyBack=1"
+enabled = true
+

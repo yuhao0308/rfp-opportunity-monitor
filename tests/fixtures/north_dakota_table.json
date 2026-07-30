@@ -1,0 +1,63 @@
+{
+  "headers": [
+    "Editing column",
+    "RFx Name",
+    "Publication begin date (UTC-5)",
+    "Publication end date (UTC-5)",
+    "Begin (UTC-5)",
+    "End (UTC-5)",
+    "Link Solicitation - Commodities",
+    "Remaining time",
+    "Status"
+  ],
+  "rows": [
+    {
+      "cells": [
+        "",
+        "Executive Search Services",
+        "7/20/2026 8:00 AM",
+        "7/20/2031 2:00 PM",
+        "7/20/2026 8:00 AM",
+        "8/05/2026 2:00 PM",
+        "Executive Search Services",
+        "6 days",
+        "Open"
+      ],
+      "links": [
+        "/page.aspx/en/bpm/process_manage_extranet/3596",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "cells": [
+        "",
+        "  Executive   Search Services ",
+        "7/20/2026 8:00 AM",
+        "7/20/2031 2:00 PM",
+        "7/20/2026 8:00 AM",
+        "8/05/2026 2:00 PM",
+        "Executive Search Services",
+        "6 days",
+        "Open"
+      ],
+      "links": [
+        "/page.aspx/en/bpm/process_manage_extranet/3596",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ]
+    }
+  ]
+}

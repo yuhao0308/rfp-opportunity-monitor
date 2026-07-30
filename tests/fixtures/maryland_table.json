@@ -1,0 +1,45 @@
+{
+  "headers": [
+    "ID",
+    "Title",
+    "Status",
+    "Due / Close Date",
+    "Main Category",
+    "Solicitation Type",
+    "Issuing Agency"
+  ],
+  "rows": [
+    {
+      "cells": [
+        "BPM048201",
+        "Higher Education Executive Recruitment",
+        "Open",
+        "08/15/2026 2:00 PM",
+        "Management advisory services",
+        "Request for Proposals",
+        "University System of Maryland"
+      ],
+      "links": [
+        "",
+        "/page.aspx/en/bpm/process_manage_extranet/48201",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "cells": [
+        "BPM048202",
+        "Campus Safety Assessment",
+        "Responses Received",
+        "07/25/2026 5:00 PM",
+        "Public safety",
+        "Public Notice",
+        "Morgan State University"
+      ],
+      "detail_url": "https://emma.maryland.gov/page.aspx/en/bpm/process_manage_extranet/48202"
+    }
+  ]
+}

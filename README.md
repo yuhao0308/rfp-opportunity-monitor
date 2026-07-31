@@ -50,6 +50,49 @@ For email delivery, copy the SMTP variable names from [`.env.example`](.env.exam
 into the company scheduler's secret store or process environment. The CLI does not
 load `.env` files or put credentials in SQLite.
 
+## Set up daily email
+
+1. Add the recipient in [`config.toml`](config.toml):
+
+   ```toml
+   recipients = ["recipient@example.com"]
+   ```
+
+2. Give the scheduler these SMTP settings:
+
+   ```text
+   SMTP_HOST=smtp.example.com
+   SMTP_PORT=587
+   SMTP_USERNAME=...
+   SMTP_PASSWORD=...
+   SMTP_FROM=rfp-monitor@example.com
+   SMTP_STARTTLS=true
+   ```
+
+3. Save the current listings without emailing them:
+
+   ```bash
+   .venv/bin/rfp-monitor scan
+   ```
+
+4. Test email with a temporary database:
+
+   ```bash
+   .venv/bin/rfp-monitor scan \
+     --state /tmp/rfp-email-test.sqlite3 \
+     --include-baseline \
+     --send
+   ```
+
+5. Schedule this command to run each morning:
+
+   ```bash
+   cd /path/to/rfp-opportunity-monitor && .venv/bin/rfp-monitor scan --send
+   ```
+
+The scheduler must receive the SMTP settings from step 2. If Maryland shows a CAPTCHA,
+the run reports the problem and keeps data from the last successful scan.
+
 ## Run
 
 Explain one title without opening a browser:

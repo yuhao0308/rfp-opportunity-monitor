@@ -1,0 +1,82 @@
+{
+  "collected_at": "2026-08-03T03:22:48.291486+00:00",
+  "count": 5,
+  "records": [
+    {
+      "agency": "Alabama Community College System",
+      "browse_url": "https://rfp.alabama.gov/PublicView.aspx",
+      "category": "DESIGN SERVICES | ARCHITECT SERVICES",
+      "detail_url": "https://www.accs.edu/vendors/",
+      "due_date": "",
+      "external_id": "2021-219-05",
+      "published_date": "",
+      "solicitation_type": "RFP",
+      "source_id": "alabama",
+      "source_name": "Alabama Public RFP Search",
+      "state": "AL",
+      "status": "Open",
+      "title": "REQUEST FOR QUALIFICATIONS (RFQ) \u2013 DESIGN PROFESSIONALS"
+    },
+    {
+      "agency": "Troy University",
+      "browse_url": "https://rfp.alabama.gov/PublicView.aspx",
+      "category": "COMMUNICATIONS & MEDIA RELATED SERVICES | GRAPHIC ARTS SERVICES (NOT PRINTING)",
+      "detail_url": "https://www.troy.edu/",
+      "due_date": "",
+      "external_id": "2026-165-04",
+      "published_date": "",
+      "solicitation_type": "RFP",
+      "source_id": "alabama",
+      "source_name": "Alabama Public RFP Search",
+      "state": "AL",
+      "status": "Open",
+      "title": "26-011 Theatre & Dance Ticketing System"
+    },
+    {
+      "agency": "Snead State Community College",
+      "browse_url": "https://rfp.alabama.gov/PublicView.aspx",
+      "category": "EDUCATIONAL SERVICES | FOR-CREDIT CLASSES, SEMINARS,",
+      "detail_url": "https://www.snead.edu/",
+      "due_date": "",
+      "external_id": "2026-255-11",
+      "published_date": "",
+      "solicitation_type": "RFP",
+      "source_id": "alabama",
+      "source_name": "Alabama Public RFP Search",
+      "state": "AL",
+      "status": "Open",
+      "title": "NC3 PRECISION MEASURING INSTRUMENTS(PMI) CERTIFICATION V2 KIT OR EQUIVILANT"
+    },
+    {
+      "agency": "Troy University",
+      "browse_url": "https://rfp.alabama.gov/PublicView.aspx",
+      "category": "DATA PROCESSING SERVICES & SOFTWARE (PROGRAMS/DEVELOP | APPLICATIONS SOFTWARE (FOR LARGE",
+      "detail_url": "https://www.troy.edu/",
+      "due_date": "",
+      "external_id": "2026-165-05",
+      "published_date": "",
+      "solicitation_type": "RFP",
+      "source_id": "alabama",
+      "source_name": "Alabama Public RFP Search",
+      "state": "AL",
+      "status": "Open",
+      "title": "Troy University RFP# 26-012 Athletics Operations, Communication, and Performance Analytics Platform"
+    },
+    {
+      "agency": "Commerce",
+      "browse_url": "https://rfp.alabama.gov/PublicView.aspx",
+      "category": "CONSULTING SERVICES",
+      "detail_url": "https://procurement.staars.alabama.gov/PRDVSS1X1/advantage/AMSJS/searchSolicitation.jsp?query=RFP%40007%4026000000002%401",
+      "due_date": "2026-09-03T15:00:00-05:00",
+      "external_id": "RFP-007 -26000000002",
+      "published_date": "",
+      "solicitation_type": "Request for Proposals (RFP)",
+      "source_id": "alabama",
+      "source_name": "Alabama Public RFP Search",
+      "state": "AL",
+      "status": "OPEN",
+      "title": "Entertainment Office Study"
+    }
+  ],
+  "source": "alabama"
+}

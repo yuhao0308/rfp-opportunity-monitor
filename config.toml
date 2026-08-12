@@ -4,9 +4,12 @@ state_path = "var/rfp-monitor.sqlite3"
 headless = true
 max_pages = 50
 navigation_timeout_seconds = 45
+retry_attempts = 3
+retry_backoff_seconds = 2.0
+request_delay_seconds = 1.0
 
 [notifications]
-recipients = []
+recipients = ["ks973111@gmail.com"]
 subject_prefix = "[RFP Monitor]"
 timezone = "America/New_York"
 
@@ -18,9 +21,16 @@ url = "https://public.ndbuys.nd.gov/page.aspx/en/rfp/request_browse_public"
 enabled = true
 
 [[sources]]
+id = "alabama"
+name = "Alabama Public RFP Search"
+state = "AL"
+url = "https://rfp.alabama.gov/PublicView.aspx"
+enabled = true
+adapter = "alabama-rfp"
+
+[[sources]]
 id = "maryland"
 name = "Maryland eMMA"
 state = "MD"
 url = "https://emma.maryland.gov/page.aspx/en/rfp/request_browse_public?historyBack=1"
 enabled = true
-

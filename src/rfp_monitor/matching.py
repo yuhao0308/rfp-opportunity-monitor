@@ -50,7 +50,7 @@ _MARKET_NOTICE = re.compile(
 
 
 def load_keyword_groups(path: str | Path) -> dict[str, tuple[str, ...]]:
-    data = json.loads(Path(path).read_text())
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise TypeError("Keyword library must be a JSON object")
 

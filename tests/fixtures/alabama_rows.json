@@ -1,0 +1,32 @@
+[
+  {
+    "external_id": "2026-165-04",
+    "title": "Graphic design services",
+    "agency": "Troy University",
+    "detail_url": "https://www.troy.edu/",
+    "status": "Open",
+    "category": "COMMUNICATIONS & MEDIA RELATED SERVICES",
+    "subcategory": "GRAPHIC ARTS SERVICES (NOT PRINTING)",
+    "solicitation_type": "RFP"
+  },
+  {
+    "external_id": "RFP-011 -26000000009",
+    "title": "Laboratory Facility Operations and Management Provider",
+    "agency": "Public Health",
+    "status": "OPEN",
+    "category": "CONSULTING SERVICES",
+    "solicitation_type": "RFP"
+  },
+  {
+    "external_id": "RFP-011 -26000000009",
+    "title": "Duplicate record",
+    "agency": "Public Health",
+    "status": "OPEN",
+    "category": "CONSULTING SERVICES"
+  },
+  {
+    "external_id": "",
+    "title": "Malformed row without an identifier",
+    "status": "OPEN"
+  }
+]

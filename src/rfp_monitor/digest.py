@@ -11,6 +11,16 @@ from .models import Alert
 ORDER = ("Strong opportunity", "Possible opportunity", "Market intelligence")
 
 
+def _format_timestamp(value: datetime) -> str:
+    """Format a digest timestamp without platform-specific strftime flags."""
+
+    hour = value.hour % 12 or 12
+    return (
+        f"{value.strftime('%B')} {value.day}, {value.year} at "
+        f"{hour}:{value.strftime('%M %p %Z')}"
+    )
+
+
 def _group(alerts: list[Alert]) -> dict[str, list[Alert]]:
     grouped: dict[str, list[Alert]] = defaultdict(list)
     for alert in alerts:
@@ -21,7 +31,7 @@ def _group(alerts: list[Alert]) -> dict[str, list[Alert]]:
 def render_text(
     alerts: list[Alert], errors: dict[str, str], timezone_name: str
 ) -> str:
-    stamp = datetime.now(ZoneInfo(timezone_name)).strftime("%B %-d, %Y at %-I:%M %p %Z")
+    stamp = _format_timestamp(datetime.now(ZoneInfo(timezone_name)))
     lines = [f"RFP opportunity digest — {stamp}", ""]
     grouped = _group(alerts)
     if not alerts:
@@ -54,7 +64,7 @@ def render_text(
 def render_html(
     alerts: list[Alert], errors: dict[str, str], timezone_name: str
 ) -> str:
-    stamp = datetime.now(ZoneInfo(timezone_name)).strftime("%B %d, %Y at %I:%M %p %Z")
+    stamp = _format_timestamp(datetime.now(ZoneInfo(timezone_name)))
     grouped = _group(alerts)
     sections: list[str] = [
         "<!doctype html><html><body style=\"font-family:Arial,sans-serif;color:#102a43\">",
@@ -111,4 +121,3 @@ def render_json(alerts: list[Alert], errors: dict[str, str]) -> str:
         "errors": errors,
     }
     return json.dumps(payload, indent=2, sort_keys=True)
-

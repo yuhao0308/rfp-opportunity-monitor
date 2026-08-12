@@ -10,14 +10,18 @@ from rfp_monitor.source import (
     AccessChallenge,
     JaggaerScanner,
     SourceError,
+    next_alabama_page,
+    normalize_alabama_date,
+    normalize_alabama_rows,
     normalize_table_rows,
+    parse_alabama_detail,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def _fixture(name: str) -> dict[str, object]:
-    return json.loads((FIXTURES / name).read_text())
+    return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
 def test_normalizes_live_north_dakota_headers_and_deduplicates() -> None:
@@ -96,11 +100,96 @@ def test_scanner_validates_usage_without_importing_browser() -> None:
     assert issubclass(AccessChallenge, SourceError)
 
 
+def test_normalizes_alabama_rows_and_deduplicates() -> None:
+    source = SourceConfig(
+        id="alabama",
+        name="Alabama Public RFP Search",
+        state="AL",
+        url="https://rfp.alabama.gov/PublicView.aspx",
+        adapter="alabama-rfp",
+    )
+    rows = _fixture("alabama_rows.json")
+
+    opportunities = normalize_alabama_rows(source, rows)
+
+    assert len(opportunities) == 2
+    assert opportunities[0].external_id == "2026-165-04"
+    assert opportunities[0].title == "Graphic design services"
+    assert opportunities[0].category == (
+        "COMMUNICATIONS & MEDIA RELATED SERVICES | GRAPHIC ARTS SERVICES (NOT PRINTING)"
+    )
+    assert opportunities[1].external_id == "RFP-011 -26000000009"
+    assert opportunities[1].detail_url.endswith(
+        "searchSolicitation.jsp?query=RFP%40011%4026000000009%401"
+    )
+
+
+def test_parses_alabama_detail_and_normalizes_dates() -> None:
+    payload = """
+    Laboratory Facility Operations and Management Provider (RFP: 26000000009)*
+    noab*noab*08/07/26 5:00pm CDT*Public Health***Prof Services*
+    Request for Proposals (RFP)*Laboratory Facility Operations and Management Provider*5*
+    """
+
+    detail = parse_alabama_detail(payload)
+
+    assert detail == {
+        "title": "Laboratory Facility Operations and Management Provider",
+        "due_date": "2026-08-07T17:00:00-05:00",
+        "agency": "Public Health",
+        "category": "Prof Services",
+        "solicitation_type": "Request for Proposals (RFP)",
+    }
+    assert normalize_alabama_date("8/17/2026") == "2026-08-17"
+    assert normalize_alabama_date("noab") == ""
+    assert normalize_alabama_date("unknown") == "unknown"
+
+
+def test_malformed_alabama_detail_is_ignored() -> None:
+    assert parse_alabama_detail("not a STAARS detail response") == {}
+
+
+def test_alabama_pagination_requires_the_next_sequential_page() -> None:
+    assert next_alabama_page("1", ["2", "3", "11"]) == 2
+    assert next_alabama_page(10, ["1", "...", "11"]) == 11
+    assert next_alabama_page(2, ["1", "4"]) is None
+    assert next_alabama_page("unknown", ["2"]) is None
+
+
+def test_scanner_retries_timeout_and_fails_safely() -> None:
+    class TimeoutPage:
+        def goto(self, *_: object, **__: object) -> None:
+            raise TimeoutError("navigation timed out")
+
+        def close(self) -> None:
+            return None
+
+    class TimeoutContext:
+        def __init__(self) -> None:
+            self.attempts = 0
+
+        def new_page(self) -> TimeoutPage:
+            self.attempts += 1
+            return TimeoutPage()
+
+    context = TimeoutContext()
+    scanner = JaggaerScanner(retry_attempts=2, retry_backoff_seconds=0)
+    scanner._context = context
+    source = SourceConfig("source", "Source", "ST", "https://example.test/rfps")
+
+    with pytest.raises(SourceError, match="navigation timed out"):
+        scanner.scan(source)
+    assert context.attempts == 2
+
+
 @pytest.mark.parametrize(
     ("argument", "message"),
     [
         ({"max_pages": 0}, "max_pages"),
         ({"navigation_timeout_seconds": 0}, "navigation_timeout_seconds"),
+        ({"retry_attempts": 0}, "retry_attempts"),
+        ({"retry_backoff_seconds": -1}, "retry_backoff_seconds"),
+        ({"request_delay_seconds": -1}, "request_delay_seconds"),
     ],
 )
 def test_scanner_rejects_invalid_limits(

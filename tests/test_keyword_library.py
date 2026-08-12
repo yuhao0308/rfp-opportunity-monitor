@@ -7,7 +7,7 @@ LIBRARY = Path(__file__).parents[1] / "config" / "keywords.json"
 
 
 def test_full_framework_library_is_preserved():
-    raw = json.loads(LIBRARY.read_text())
+    raw = json.loads(LIBRARY.read_text(encoding="utf-8"))
     groups = load_keyword_library(LIBRARY)
 
     assert raw["_meta"]["term_count"] == 1_141

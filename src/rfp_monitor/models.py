@@ -12,6 +12,7 @@ class SourceConfig:
     state: str
     url: str
     enabled: bool = True
+    adapter: str = "jaggaer"
 
 
 @dataclass(frozen=True)
@@ -92,4 +93,3 @@ class Alert:
     change_kind: str
     opportunity: Opportunity
     match: MatchResult
-

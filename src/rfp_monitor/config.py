@@ -40,11 +40,31 @@ class EmailConfig:
 
 
 @dataclass(frozen=True)
+class ScheduleConfig:
+    """When the unattended email-scan runs, in the machine's local time."""
+
+    hour: int = 7
+    minute: int = 0
+    forward: bool = True
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.hour <= 23:
+            raise ValueError(f"schedule.hour must be 0-23, got {self.hour}")
+        if not 0 <= self.minute <= 59:
+            raise ValueError(f"schedule.minute must be 0-59, got {self.minute}")
+
+    @property
+    def clock(self) -> str:
+        return f"{self.hour:02d}:{self.minute:02d}"
+
+
+@dataclass(frozen=True)
 class AppConfig:
     monitor: MonitorConfig
     notifications: NotificationConfig
     sources: tuple[SourceConfig, ...]
     email: EmailConfig = EmailConfig()
+    schedule: ScheduleConfig = ScheduleConfig()
 
 
 def _resolve(base: Path, raw: str | None) -> Path | None:
@@ -100,6 +120,13 @@ def load_config(path: str | Path) -> AppConfig:
         max_messages=int(email_data.get("max_messages", 200)),
     )
 
+    schedule_data = data.get("schedule", {})
+    schedule = ScheduleConfig(
+        hour=int(schedule_data.get("hour", 7)),
+        minute=int(schedule_data.get("minute", 0)),
+        forward=bool(schedule_data.get("forward", True)),
+    )
+
     sources = tuple(SourceConfig(**entry) for entry in data.get("sources", []))
     enabled_ids = [source.id for source in sources if source.enabled]
     if not enabled_ids:
@@ -107,5 +134,9 @@ def load_config(path: str | Path) -> AppConfig:
     if len(enabled_ids) != len(set(enabled_ids)):
         raise ValueError("Source IDs must be unique")
     return AppConfig(
-        monitor=monitor, notifications=notifications, sources=sources, email=email
+        monitor=monitor,
+        notifications=notifications,
+        sources=sources,
+        email=email,
+        schedule=schedule,
     )

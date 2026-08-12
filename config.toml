@@ -22,6 +22,14 @@ forward_to = ["ks973111@gmail.com"]
 since_days = 7
 max_messages = 200
 
+[schedule]
+# Daily email-scan run time, in the machine's local timezone.
+# Change these, then re-run: scripts/schedule_email_scan.py install
+hour = 7
+minute = 0
+# false runs a preview each morning and sends nothing.
+forward = true
+
 [[sources]]
 id = "north-dakota"
 name = "North Dakota Buys"

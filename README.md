@@ -142,6 +142,38 @@ Send for real, to a throwaway state database first:
 .\.venv\Scripts\rfp-monitor.exe email-scan --state .\var\validation\email-test.sqlite3 --forward
 ```
 
+### Run it every morning
+
+`email-scan` polls; nothing pushes to it. Gmail cannot call this machine, so the
+delay between Maryland sending a notice and the forward arriving is however often
+the job runs.
+
+Set the time in [`config.toml`](config.toml) and install the job:
+
+```bash
+scripts/schedule_email_scan.py install
+```
+
+```toml
+[schedule]
+hour = 7
+minute = 0
+forward = true   # false previews each morning and sends nothing
+```
+
+The time lives in config, so changing it is an edit plus a re-install rather than
+hand-editing a plist. `status` shows the configured time, whether the job is
+loaded, and its last exit code; `uninstall` removes it.
+
+`scripts/run_email_scan.py` is what the schedule actually calls. It loads `.env`,
+runs the scan, and appends a timestamped entry to `logs/email-scan.log`. The CLI
+itself still never reads `.env` — the wrapper is deployment glue, so credentials
+stay out of the application and its state database. If `IMAP_PASSWORD` is empty
+the wrapper logs that and exits 2 without contacting anything.
+
+On Windows Server, point a Task Scheduler action at `run_email_scan.py` instead;
+the launchd installer is macOS-only and says so.
+
 ### What the matcher can see
 
 An eMMA notice carries only the RFx name, BPM ID, commodity, lot, round, end date, and

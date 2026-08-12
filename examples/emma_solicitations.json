@@ -1,0 +1,47 @@
+{
+  "_comment": "Solicitation records copied from eMMA detail pages. Feed to scripts/make_emma_emails.py to render notification emails for testing.",
+  "solicitations": [
+    {
+      "title": "Medicaid and Private Insurance Consultation Services For School-Based Community Providers",
+      "id": "BPM058205",
+      "alternate_id": "RFP91221EC",
+      "functional_area": "1",
+      "round": "4",
+      "status": "Open",
+      "due_date": "Aug 17 2026 5:00PM",
+      "solicitation_type": "RFP: Double Envelope Proposal",
+      "main_category": "Training planning and development consultancy service",
+      "issuing_agency": "University of Maryland - Baltimore",
+      "buyer": "Elle CRESTBORN",
+      "buyer_email": "ecrestborn@umaryland.edu",
+      "sent_at": "2026-08-11T09:12:00"
+    },
+    {
+      "title": "Educational Materials",
+      "id": "BPM058348",
+      "round": "1",
+      "due_date": "8/14/2026",
+      "main_category": "Other",
+      "buyer": "Augustus Woyah",
+      "sent_at": "2026-08-10T17:18:02"
+    },
+    {
+      "title": "TMDL Areawide Impervious Surface Restoration Design-Build Project",
+      "id": "BPM057567",
+      "round": "5",
+      "due_date": "9/9/2026",
+      "main_category": "Heavy construction machinery and equipment",
+      "buyer": "Catherine1 Agostino",
+      "sent_at": "2026-08-07T15:40:00"
+    },
+    {
+      "title": "25228 GX0 Days Cove Park Disc Golf Course, 6425 Days Cove Road, White Marsh, Maryland 21162",
+      "id": "BPM057890",
+      "round": "1",
+      "due_date": "8/6/2026",
+      "main_category": "Other",
+      "buyer": "Barbara Wentworth",
+      "sent_at": "2026-08-06T08:34:00"
+    }
+  ]
+}

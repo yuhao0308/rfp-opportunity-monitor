@@ -10,3 +10,4 @@ dist/
 *.egg-info/
 var/
 logs/
+tests/fixtures/emails/generated/

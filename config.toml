@@ -13,6 +13,15 @@ recipients = ["ks973111@gmail.com"]
 subject_prefix = "[RFP Monitor]"
 timezone = "America/New_York"
 
+[email]
+# Inbox ingestion for portals that notify registered vendors by email.
+enabled = true
+folder = "INBOX"
+senders = ["no-reply.emma@maryland.gov"]
+forward_to = ["ks973111@gmail.com"]
+since_days = 7
+max_messages = 200
+
 [[sources]]
 id = "north-dakota"
 name = "North Dakota Buys"

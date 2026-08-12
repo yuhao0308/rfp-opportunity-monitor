@@ -47,6 +47,7 @@ _MARKET_NOTICE = re.compile(
     r"intent\s+to\s+(?:enter|participate))(?!\w)",
     re.IGNORECASE,
 )
+_NAICS_CODE = re.compile(r"^\s*\d{2,6}\s*[—–-]\s*")
 
 
 def load_keyword_groups(path: str | Path) -> dict[str, tuple[str, ...]]:
@@ -66,6 +67,22 @@ def load_keyword_groups(path: str | Path) -> dict[str, tuple[str, ...]]:
 def _phrase_pattern(phrase: str) -> re.Pattern[str]:
     escaped = re.escape(phrase).replace(r"\ ", r"\s+")
     return re.compile(rf"(?<!\w){escaped}(?!\w)", re.IGNORECASE)
+
+
+def _term_patterns(group: str, phrase: str) -> tuple[re.Pattern[str], ...]:
+    """Patterns that count as a hit for one term.
+
+    NAICS entries are written "611710 — Educational Support Services", but a portal
+    category or an email's commodity line prints the descriptive name on its own, so
+    the code-prefixed form alone would never match real records.
+    """
+
+    patterns = [_phrase_pattern(phrase)]
+    if group == "naics":
+        bare = _NAICS_CODE.sub("", phrase).strip()
+        if bare and bare != phrase:
+            patterns.append(_phrase_pattern(bare))
+    return tuple(patterns)
 
 
 def _parse_date(value: str) -> date | None:
@@ -119,7 +136,7 @@ class KeywordMatcher:
             for name in GROUPS
         }
         self._patterns = {
-            name: tuple((term, _phrase_pattern(term)) for term in terms)
+            name: tuple((term, _term_patterns(name, term)) for term in terms)
             for name, terms in self.groups.items()
         }
         self.today = today
@@ -130,8 +147,12 @@ class KeywordMatcher:
 
     def _matches(self, text: str) -> dict[str, tuple[str, ...]]:
         matched = {}
-        for name, patterns in self._patterns.items():
-            terms = tuple(term for term, pattern in patterns if pattern.search(text))
+        for name, entries in self._patterns.items():
+            terms = tuple(
+                term
+                for term, patterns in entries
+                if any(pattern.search(text) for pattern in patterns)
+            )
             if terms:
                 matched[name] = terms
         return matched

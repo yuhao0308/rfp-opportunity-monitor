@@ -164,6 +164,17 @@ def test_naics_phrase_alone_is_not_a_possible_opportunity(groups):
     assert result.matched["naics"] == ("611710 — Educational Support Services",)
 
 
+def test_naics_matches_the_descriptive_name_without_its_code(groups):
+    """Portals and eMMA email print the category name without the NAICS number."""
+
+    result = KeywordMatcher(groups).match(
+        opportunity("Candidate sourcing", category="Educational support services")
+    )
+
+    assert result.matched["naics"] == ("611710 — Educational Support Services",)
+    assert result.classification == "Possible opportunity"
+
+
 def test_naics_can_corroborate_priority_two(groups):
     result = KeywordMatcher(groups).match(
         opportunity("Candidate sourcing: 611710 — Educational Support Services")

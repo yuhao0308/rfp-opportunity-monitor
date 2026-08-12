@@ -102,90 +102,124 @@ load `.env` files or put credentials in SQLite.
 The Windows Task Scheduler account must receive the SMTP settings from step 2. The Alabama-only
 filter avoids repeated warning email while North Dakota and Maryland show browser verification.
 
-## Email ingestion (Maryland eMMA)
+## How the Maryland email workflow works
 
-Once a vendor account is registered, eMMA emails a "New / Updated Solicitation" notice
-for every invitation. `email-scan` reads that inbox, applies the same keyword framework,
-and forwards only what qualifies.
+Once you're registered as a vendor on eMMA, Maryland emails you every time a
+solicitation opens. Those emails all look the same, so the monitor reads them
+for you.
 
-```powershell
-.\.venv\Scripts\rfp-monitor.exe email-scan
+Here's the whole thing, start to finish:
+
+1. Maryland sends a "New / Updated Solicitation" email to your inbox.
+2. Every morning at 7:00, a scheduled job wakes up.
+3. It logs into that inbox and pulls the eMMA emails from the last 7 days.
+4. Out of each email it takes the useful bits: the RFx name, BPM ID, commodity,
+   round, end date, and the link.
+5. It checks those against the keyword list to decide whether it's the kind of
+   work you want.
+6. If it is, it forwards the email to you, with a short note explaining why it
+   matched and the original attached.
+7. If it isn't, it's skipped. Either way the run is written to a log.
+
+Nothing happens the moment Maryland hits send. The job only looks once a day, so
+you'll hear about a new solicitation the following morning.
+
+### Setting it up
+
+There are two files to fill in.
+
+`.env` holds your mailbox login. Use a Gmail app password, not your normal
+password, and keep the quotes — the password has spaces in it and things break
+without them.
+
+```
+IMAP_HOST=imap.gmail.com
+IMAP_PORT=993
+IMAP_USERNAME=you@gmail.com
+IMAP_PASSWORD="xxxx xxxx xxxx xxxx"
 ```
 
-Configure it under `[email]` in [`config.toml`](config.toml) and add the IMAP variables
-from [`.env.example`](.env.example) to the scheduler's secret store. Gmail requires an
-app password, not the account password.
+`config.toml` says who gets the forwards and when the job runs.
 
-How it behaves:
+```toml
+[email]
+senders = ["no-reply.emma@maryland.gov"]
+forward_to = ["you@gmail.com"]
+since_days = 7
 
-- **Preview by default.** Nothing is sent and nothing is recorded until you pass
-  `--forward`, so a dry run cannot silence the delivery run that follows it.
-- **Read-only mailbox access.** The folder is opened `readonly` and fetched with
-  `BODY.PEEK[]`, so messages you have not read stay unread and no flags change.
-- **Forwards carry the reason.** Each forward states the classification, the score, and
-  the matched signals, and attaches the untouched original as `.eml`.
-- **No duplicates.** A message is forwarded once, tracked by `Message-ID`, and the
-  solicitation is tracked by BPM ID so a later round is reported as `changed` rather
-  than as a second `new`.
-- **Nothing is persisted when a send fails**, so the next run retries that message.
-- **Links are never fetched.** The solicitation URL is passed through for a human.
-
-Exercise the whole pipeline against saved messages instead of a live mailbox:
-
-```powershell
-.\.venv\Scripts\rfp-monitor.exe email-scan --from-dir tests\fixtures\emails
+[schedule]
+hour = 7
+minute = 0
+forward = true
 ```
 
-Send for real, to a throwaway state database first:
-
-```powershell
-.\.venv\Scripts\rfp-monitor.exe email-scan --state .\var\validation\email-test.sqlite3 --forward
-```
-
-### Run it every morning
-
-`email-scan` polls; nothing pushes to it. Gmail cannot call this machine, so the
-delay between Maryland sending a notice and the forward arriving is however often
-the job runs.
-
-Set the time in [`config.toml`](config.toml) and install the job:
+Then turn the job on:
 
 ```bash
 scripts/schedule_email_scan.py install
 ```
 
-```toml
-[schedule]
-hour = 7
-minute = 0
-forward = true   # false previews each morning and sends nothing
+To change the time, edit `config.toml` and run `install` again.
+
+### Everyday commands
+
+Try it without sending anything:
+
+```bash
+scripts/run_email_scan.py --preview
 ```
 
-The time lives in config, so changing it is an edit plus a re-install rather than
-hand-editing a plist. `status` shows the configured time, whether the job is
-loaded, and its last exit code; `uninstall` removes it.
+Check whether the job is running, and when it last ran:
 
-`scripts/run_email_scan.py` is what the schedule actually calls. It loads `.env`,
-runs the scan, and appends a timestamped entry to `logs/email-scan.log`. The CLI
-itself still never reads `.env` — the wrapper is deployment glue, so credentials
-stay out of the application and its state database. If `IMAP_PASSWORD` is empty
-the wrapper logs that and exits 2 without contacting anything.
+```bash
+scripts/schedule_email_scan.py status
+```
 
-On Windows Server, point a Task Scheduler action at `run_email_scan.py` instead;
-the launchd installer is macOS-only and says so.
+See what it has been doing:
 
-### What the matcher can see
+```bash
+tail logs/email-scan.log
+```
 
-An eMMA notice carries only the RFx name, BPM ID, commodity, lot, round, end date, and
-requester — far less text than a portal listing. Two deliberate exclusions:
+Turn it off:
 
-- The **requester is a person**, so it is kept out of the matched text. A requester named
-  "Dean" or "Chancellor" would otherwise inject a false leadership signal.
-- The **per-round link** is kept out of the fingerprint, because a token that rotates on
-  every send would otherwise look like a changed solicitation and re-alert.
+```bash
+scripts/schedule_email_scan.py uninstall
+```
 
-`Main commodity` is `Other` on most notices, so in practice the RFx name carries the
-decision. That is the narrow input the planned transformer pass is meant to widen.
+### Good to know
+
+- **You won't get the same thing twice.** Once an email has been forwarded it's
+  remembered, so a re-send doesn't reach you again. A new round does come
+  through, because that really is new.
+- **Your inbox isn't touched.** It only reads. Nothing is marked read, moved, or
+  deleted.
+- **Nothing sends by accident.** Every command previews unless you ask it to
+  send. Only the scheduled job and `--forward` actually mail anything.
+- **A failed send is retried tomorrow** instead of being quietly dropped.
+- **Links are never opened**, just passed along for you to click.
+- **Most emails won't match, and that's fine.** The keyword list is tuned for
+  executive search, so roofing and road work get skipped.
+
+### What it has to work with
+
+The email is short. It gives the RFx name, BPM ID, commodity, lot, round, end
+date, and requester, which is a lot less than the portal page shows, so the name
+of the solicitation ends up doing most of the work. `Main commodity` is "Other"
+on most notices, so don't lean on it.
+
+Two things are deliberately left out of the matching:
+
+- The **requester's name**, because someone called "Dean" or "Chancellor" would
+  read as a job title and cause a false match.
+- The **link**, because Maryland builds a fresh one every time it sends, and we'd
+  otherwise mistake that for the solicitation itself having changed.
+
+### On Windows
+
+The `install` command is macOS only. On Windows Server, point a Task Scheduler
+action at `scripts/run_email_scan.py` and see
+[`docs/deployment_guide.md`](docs/deployment_guide.md).
 
 ## Run
 

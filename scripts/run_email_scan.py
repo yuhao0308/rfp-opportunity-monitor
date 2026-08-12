@@ -28,6 +28,23 @@ MAX_LOG_BYTES = 5 * 1024 * 1024
 REQUIRED = ("IMAP_HOST", "IMAP_USERNAME", "IMAP_PASSWORD")
 
 
+def venv_python() -> str:
+    """The interpreter that has rfp_monitor installed.
+
+    Never sys.executable: run through its shebang this script starts under
+    whichever python3 is first on PATH, which is not the virtualenv and cannot
+    import the package.
+    """
+
+    for candidate in (
+        ROOT / ".venv" / "bin" / "python",
+        ROOT / ".venv" / "Scripts" / "python.exe",
+    ):
+        if candidate.exists():
+            return str(candidate)
+    return sys.executable
+
+
 def load_env(path: Path) -> dict[str, str]:
     """Parse KEY=VALUE lines, honouring quotes around values that contain spaces."""
 
@@ -77,14 +94,19 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: missing in .env: {', '.join(missing)}", file=sys.stderr)
         return 2
 
-    command = [sys.executable, "-m", "rfp_monitor", "email-scan", "--config", args.config]
+    command = [venv_python(), "-m", "rfp_monitor", "email-scan", "--config", args.config]
     if forward:
         command.append("--forward")
+
+    # src on the path keeps this working in a checkout where the package was
+    # never installed into the virtualenv.
+    existing = os.environ.get("PYTHONPATH", "")
+    child_path = str(ROOT / "src") + (os.pathsep + existing if existing else "")
 
     result = subprocess.run(
         command,
         cwd=ROOT,
-        env={**os.environ, **settings},
+        env={**os.environ, **settings, "PYTHONPATH": child_path},
         capture_output=True,
         text=True,
         check=False,

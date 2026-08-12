@@ -22,17 +22,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from run_email_scan import venv_python
 
 from rfp_monitor.config import load_config
 
 LABEL = "com.rfp-monitor.email-scan"
 PLIST = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
 RUNNER = ROOT / "scripts" / "run_email_scan.py"
-
-
-def _python() -> Path:
-    candidate = ROOT / ".venv" / "bin" / "python"
-    return candidate if candidate.exists() else Path(sys.executable)
 
 
 def _domain() -> str:
@@ -44,7 +42,7 @@ def _domain() -> str:
 def build_plist(hour: int, minute: int) -> dict[str, object]:
     return {
         "Label": LABEL,
-        "ProgramArguments": [str(_python()), str(RUNNER)],
+        "ProgramArguments": [venv_python(), str(RUNNER)],
         "WorkingDirectory": str(ROOT),
         "StartCalendarInterval": {"Hour": hour, "Minute": minute},
         # The wrapper writes its own timestamped log; these catch anything that

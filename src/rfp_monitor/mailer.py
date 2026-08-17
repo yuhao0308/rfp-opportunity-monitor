@@ -7,8 +7,8 @@ from email.message import EmailMessage
 from html import escape
 
 from .config import NotificationConfig
-from .emma_email import EmmaNotice
 from .models import MatchResult
+from .notice_email import Notice
 
 
 def _truthy(value: str | None, default: bool = True) -> bool:
@@ -57,17 +57,18 @@ def send_digest(
     _deliver(message)
 
 
-def render_forward_text(notice: EmmaNotice, match: MatchResult, change_kind: str) -> str:
+def render_forward_text(notice: Notice, match: MatchResult, change_kind: str) -> str:
     matched = "\n".join(
         f"  {group}: {', '.join(terms)}" for group, terms in sorted(match.matched.items())
     )
     rows = [
-        ("RFx name", notice.rfx_name),
-        ("BPM ID", notice.bpm_id),
-        ("Main commodity", notice.commodity),
-        ("Lot #", notice.lot),
-        ("Round #", notice.round_number),
-        ("End date", notice.end_date),
+        ("Source", notice.source_name),
+        ("Title", notice.title),
+        ("ID", notice.external_id),
+        ("Category", notice.category),
+        ("Lot", notice.lot),
+        ("Round", notice.round_number),
+        ("Due date", notice.due_date),
         ("Requester", notice.requester),
     ]
     lines = [
@@ -87,20 +88,21 @@ def render_forward_text(notice: EmmaNotice, match: MatchResult, change_kind: str
             "",
             f"Link: {notice.link or 'not present in the notification'}",
             "",
-            "The original eMMA notification is attached as .eml.",
+            "The original notification is attached as .eml.",
         )
     )
     return "\n".join(lines) + "\n"
 
 
-def render_forward_html(notice: EmmaNotice, match: MatchResult, change_kind: str) -> str:
+def render_forward_html(notice: Notice, match: MatchResult, change_kind: str) -> str:
     rows = [
-        ("RFx name", notice.rfx_name),
-        ("BPM ID", notice.bpm_id),
-        ("Main commodity", notice.commodity),
-        ("Lot #", notice.lot),
-        ("Round #", notice.round_number),
-        ("End date", notice.end_date),
+        ("Source", notice.source_name),
+        ("Title", notice.title),
+        ("ID", notice.external_id),
+        ("Category", notice.category),
+        ("Lot", notice.lot),
+        ("Round", notice.round_number),
+        ("Due date", notice.due_date),
         ("Requester", notice.requester),
     ]
     cells = "".join(
@@ -115,27 +117,27 @@ def render_forward_html(notice: EmmaNotice, match: MatchResult, change_kind: str
     )
     link = escape(notice.link, quote=True) if notice.link else ""
     link_html = (
-        f"<p><a href=\"{link}\">Open the solicitation in eMMA</a></p>"
+        f"<p><a href=\"{link}\">Open the solicitation</a></p>"
         if link
         else "<p>No solicitation link was present in the notification.</p>"
     )
     return (
         "<!doctype html><html><body style=\"font-family:Arial,sans-serif;color:#102a43\">"
-        f"<h1 style=\"font-size:20px;margin:0 0 4px\">{escape(notice.rfx_name)}</h1>"
+        f"<h1 style=\"font-size:20px;margin:0 0 4px\">{escape(notice.title)}</h1>"
         f"<p style=\"margin:0 0 14px;color:#627d98\">{escape(match.classification or '')}"
         f" · score {match.score} · {escape(change_kind)}</p>"
         f"<p style=\"margin:0 0 14px\"><strong>Why:</strong> {escape(match.reason)}</p>"
         f"<table style=\"border-collapse:collapse;font-size:14px\">{cells}</table>"
         f"{link_html}"
         f"<p style=\"margin:14px 0 4px\"><strong>Matched signals</strong></p><ul>{matched}</ul>"
-        "<p style=\"color:#627d98;font-size:13px\">The original eMMA notification is "
+        "<p style=\"color:#627d98;font-size:13px\">The original notification is "
         "attached as .eml.</p></body></html>"
     )
 
 
 def build_forward(
     recipients: Sequence[str],
-    notice: EmmaNotice,
+    notice: Notice,
     match: MatchResult,
     change_kind: str,
     original: EmailMessage,
@@ -147,7 +149,7 @@ def build_forward(
 
     message = EmailMessage()
     message["Subject"] = (
-        f"{subject_prefix} {match.classification}: {notice.rfx_name}".strip()
+        f"{subject_prefix} {match.classification}: {notice.title}".strip()
     )
     message["From"] = sender
     message["To"] = ", ".join(recipients)
@@ -156,21 +158,21 @@ def build_forward(
     message.set_content(render_forward_text(notice, match, change_kind))
     message.add_alternative(render_forward_html(notice, match, change_kind), subtype="html")
 
-    filename = f"emma-{notice.bpm_id or 'notice'}.eml"
+    filename = f"{notice.source_id}-{notice.external_id or 'notice'}.eml"
     message.add_attachment(original, filename=filename)
     return message
 
 
 def forward_notice(
     recipients: Sequence[str],
-    notice: EmmaNotice,
+    notice: Notice,
     match: MatchResult,
     change_kind: str,
     original: EmailMessage,
     *,
     subject_prefix: str = "[RFP Monitor]",
 ) -> EmailMessage:
-    """Forward one matched eMMA notice over SMTP."""
+    """Forward one matched notice over SMTP."""
 
     message = build_forward(
         recipients,

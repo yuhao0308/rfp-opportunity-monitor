@@ -14,13 +14,62 @@ subject_prefix = "[RFP Monitor]"
 timezone = "America/New_York"
 
 [email]
-# Inbox ingestion for portals that notify registered vendors by email.
+# Mailbox and delivery settings, shared by every email source below.
 enabled = true
 folder = "INBOX"
-senders = ["no-reply.emma@maryland.gov"]
 forward_to = ["ks973111@gmail.com"]
 since_days = 7
 max_messages = 200
+
+# ---------------------------------------------------------------------------
+# Email sources. To add a portal, copy the block below and change the values.
+# No code change is needed as long as the notice puts each field after a label
+# ("End date: 9/9/2026"). Fields you leave out are simply not read.
+#
+# Allowed field names: title, external_id, category, lot, round_number,
+# due_date, requester. The value is the label as it appears in the email.
+# ---------------------------------------------------------------------------
+
+[[email_sources]]
+id = "maryland-emma-email"
+name = "Maryland eMMA (email)"
+state = "MD"
+enabled = true
+senders = ["no-reply.emma@maryland.gov"]
+# Kept broad so a change to another maryland.gov address does not silently
+# stop the feed.
+sender_domains = ["maryland.gov"]
+subject_pattern = 'new\s*/\s*updated\s+solicitation\s*:\s*(?P<title>.+)'
+browse_url = "https://emma.maryland.gov/page.aspx/en/rfp/request_browse_public"
+link_text = "Link"
+link_hosts = ["emma.maryland.gov"]
+uninformative = ["undefined", "n/a", "none", "other"]
+
+[email_sources.fields]
+title = "RFx name"
+external_id = "BPM ID"
+category = "Main commodity"
+lot = "Lot #"
+round_number = "Round #"
+due_date = "End date"
+requester = "Requester"
+
+# Template for the next portal — fill in and set enabled = true.
+#
+# [[email_sources]]
+# id = "south-dakota-email"
+# name = "South Dakota (email)"
+# state = "SD"
+# enabled = false
+# senders = ["noreply@state.sd.us"]
+# subject_pattern = 'bid\s+opportunity\s*:\s*(?P<title>.+)'
+# browse_url = "https://sdbidsystem.example/"
+# link_text = "View Solicitation"
+#
+# [email_sources.fields]
+# title = "Solicitation Title"
+# external_id = "Solicitation Number"
+# due_date = "Closing Date"
 
 [schedule]
 # Daily email-scan run time, in the machine's local timezone.

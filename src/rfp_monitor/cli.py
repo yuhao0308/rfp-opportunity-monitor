@@ -13,13 +13,17 @@ from smtplib import SMTPException
 
 from .config import load_config
 from .digest import render_html, render_json, render_text
-from .emma_email import SOURCE_ID, SOURCE_NAME, EmmaEmailError, parse_emma_email
 from .mailbox import MailboxError, fetch_raw_messages, read_eml_directory
 from .mailer import forward_notice, send_digest
 from .matching import Matcher, load_keyword_library
 from .models import Alert, Opportunity
+from .notice_email import NoticeEmailError, parse_any
 from .source import JaggaerScanner, SourceError
 from .state import StateStore
+
+# Ledger key for mail that no configured source claims, so those messages are
+# examined once rather than on every run.
+UNMATCHED = "email-unmatched"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -221,13 +225,26 @@ def _email_scan(args: argparse.Namespace) -> int:
     if args.forward and not settings.forward_to:
         raise ValueError("--forward requires email.forward_to in config or --forward-to")
 
+    email_sources = config.enabled_email_sources
+    if not email_sources:
+        raise ValueError("No enabled [[email_sources]] in the config")
+
     if args.from_dir:
         raw_messages = read_eml_directory(args.from_dir)
         origin = args.from_dir
     else:
+        # Fetch anything any configured source might claim, then let the
+        # sources sort out which of them recognises each message.
+        senders = tuple(
+            dict.fromkeys(
+                address
+                for source in email_sources
+                for address in (*source.senders, *source.sender_domains)
+            )
+        )
         raw_messages = fetch_raw_messages(
             folder=settings.folder,
-            senders=settings.senders,
+            senders=senders,
             since_days=settings.since_days,
             limit=settings.max_messages,
         )
@@ -244,27 +261,37 @@ def _email_scan(args: argparse.Namespace) -> int:
             message_id = str(message.get("Message-ID", "")).strip()
             subject = " ".join(str(message.get("Subject", "")).split())
 
-            if not args.reprocess and state.email_is_processed(SOURCE_ID, message_id):
+            try:
+                notice, source = parse_any(message, email_sources)
+                source_key = source.id
+                failure = ""
+            except NoticeEmailError as exc:
+                notice = None
+                source_key = UNMATCHED
+                failure = str(exc)
+
+            if not args.reprocess and state.email_is_processed(source_key, message_id):
                 decisions.append(
                     {"outcome": "already processed", "subject": subject, "forwarded": False}
                 )
                 continue
 
-            try:
-                notice = parse_emma_email(message, allowed_senders=settings.senders)
-            except EmmaEmailError as exc:
+            if notice is None:
                 decisions.append(
-                    {"outcome": f"not an eMMA notice ({exc})", "subject": subject,
-                     "forwarded": False}
+                    {
+                        "outcome": f"no configured source recognises it ({failure})",
+                        "subject": subject,
+                        "forwarded": False,
+                    }
                 )
                 if args.forward:
                     state.mark_email_processed(
-                        SOURCE_ID, message_id, subject=subject, outcome="unparsed"
+                        UNMATCHED, message_id, subject=subject, outcome="unmatched"
                     )
                 continue
 
             opportunity = notice.to_opportunity()
-            change = state.record_opportunity(SOURCE_ID, opportunity, persist=False)
+            change = state.record_opportunity(source_key, opportunity, persist=False)
             match = matcher.match(opportunity)
 
             if change is None and not args.reprocess:
@@ -277,6 +304,7 @@ def _email_scan(args: argparse.Namespace) -> int:
             entry: dict[str, object] = {
                 "outcome": outcome,
                 "subject": subject,
+                "source": source_key,
                 "change": change.kind if change else "none",
                 "classification": match.classification,
                 "score": match.score,
@@ -300,21 +328,21 @@ def _email_scan(args: argparse.Namespace) -> int:
                         entry["forwarded"] = True
                 except (OSError, SMTPException, ValueError) as exc:
                     # Leave state untouched so the next run retries this message.
-                    errors[notice.rfx_name or subject] = f"forward failed: {exc}"
+                    errors[notice.title or subject] = f"forward failed: {exc}"
                     entry["outcome"] = f"forward failed: {exc}"
                     decisions.append(entry)
                     continue
-                state.record_opportunity(SOURCE_ID, opportunity, persist=True)
+                state.record_opportunity(source_key, opportunity, persist=True)
                 state.mark_email_processed(
-                    SOURCE_ID, message_id, subject=subject, outcome=outcome
+                    source_key, message_id, subject=subject, outcome=outcome
                 )
             decisions.append(entry)
 
     if args.as_json:
         print(
             json.dumps(
-                {"source": SOURCE_NAME, "origin": origin, "mode":
-                 "forward" if args.forward else "preview",
+                {"sources": [source.id for source in email_sources], "origin": origin,
+                 "mode": "forward" if args.forward else "preview",
                  "decisions": decisions, "errors": errors},
                 indent=2,
                 sort_keys=True,
@@ -334,14 +362,14 @@ def _render_email_report(
 ) -> str:
     mode = "forwarding" if forwarding else "preview (no email sent)"
     lines = [
-        f"{SOURCE_NAME} — {len(decisions)} message(s) from {origin} [{mode}]",
+        f"Email notices — {len(decisions)} message(s) from {origin} [{mode}]",
         "",
     ]
     if not decisions:
         lines.append("No messages matched the fetch window and sender filter.")
     for entry in decisions:
         notice = entry.get("notice") or {}
-        title = notice.get("rfx_name") or entry.get("subject") or "(no subject)"
+        title = notice.get("title") or entry.get("subject") or "(no subject)"
         outcome = str(entry["outcome"])
         marker = "FORWARD" if outcome == "forward" else "skip   "
         if entry.get("forwarded"):
@@ -351,10 +379,12 @@ def _render_email_report(
         detail = f"        {label}"
         if entry.get("score") is not None:
             detail += f" · score {entry['score']}"
-        if notice.get("bpm_id"):
-            detail += f" · BPM {notice['bpm_id']}"
-        if notice.get("end_date"):
-            detail += f" · ends {notice['end_date']}"
+        if entry.get("source"):
+            detail += f" · {entry['source']}"
+        if notice.get("external_id"):
+            detail += f" · {notice['external_id']}"
+        if notice.get("due_date"):
+            detail += f" · ends {notice['due_date']}"
         lines.append(detail)
         reason = "" if outcome.startswith("forward failed") else entry.get("reason", "")
         lines.append(f"        {outcome}: {reason}".rstrip(": "))

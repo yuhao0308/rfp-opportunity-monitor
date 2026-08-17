@@ -4,21 +4,28 @@ from pathlib import Path
 
 import pytest
 
-from rfp_monitor.emma_email import (
-    SOURCE_ID,
-    EmmaEmailError,
-    EmmaNotice,
-    parse_emma_email,
-)
+from rfp_monitor.config import load_config
 from rfp_monitor.mailer import build_forward
 from rfp_monitor.matching import KeywordMatcher
+from rfp_monitor.notice_email import Notice, NoticeEmailError, parse_notice
 from rfp_monitor.state import StateStore
 
 FIXTURES = Path(__file__).parent / "fixtures" / "emails"
+ROOT = Path(__file__).resolve().parents[1]
+SOURCE_ID = "maryland-emma-email"
 
 
-def load(name: str) -> EmmaNotice:
-    return parse_emma_email((FIXTURES / name).read_bytes())
+def maryland():
+    """The real Maryland entry from config.toml, not a test-only copy."""
+
+    for source in load_config(ROOT / "config.toml").email_sources:
+        if source.id == SOURCE_ID:
+            return source
+    raise AssertionError(f"no [[email_sources]] entry with id {SOURCE_ID!r}")
+
+
+def load(name: str) -> Notice:
+    return parse_notice((FIXTURES / name).read_bytes(), maryland())
 
 
 @pytest.fixture
@@ -32,12 +39,12 @@ def matcher() -> KeywordMatcher:
 def test_parses_every_labelled_field():
     notice = load("01-educational-materials.eml")
 
-    assert notice.rfx_name == "Educational Materials"
-    assert notice.bpm_id == "58348"
-    assert notice.commodity == "Other"
+    assert notice.title == "Educational Materials"
+    assert notice.external_id == "58348"
+    assert notice.category == "Other"
     assert notice.lot == "UNDEFINED"
     assert notice.round_number == "1"
-    assert notice.end_date == "8/14/2026"
+    assert notice.due_date == "8/14/2026"
     assert notice.requester == "Augustus Woyah"
     assert notice.message_id == "<emma-58348-r1@maryland.gov>"
 
@@ -45,7 +52,7 @@ def test_parses_every_labelled_field():
 def test_long_rfx_name_is_not_truncated_by_plain_text_wrapping():
     notice = load("03-days-cove-disc-golf.eml")
 
-    assert notice.rfx_name == (
+    assert notice.title == (
         "25228 GX0 Days Cove Park Disc Golf Course, 6425 Days Cove Road, "
         "White Marsh, Maryland 21162"
     )
@@ -79,7 +86,7 @@ def test_solicitation_link_is_preferred_over_the_notification_settings_link():
 
 
 def test_non_solicitation_message_is_rejected():
-    with pytest.raises(EmmaEmailError, match="not a solicitation notice"):
+    with pytest.raises(NoticeEmailError, match="subject does not match"):
         load("05-maintenance-notice.eml")
 
 
@@ -87,8 +94,8 @@ def test_unexpected_sender_is_rejected():
     raw = (FIXTURES / "01-educational-materials.eml").read_bytes()
     spoofed = raw.replace(b"no-reply.emma@maryland.gov", b"phish@example.invalid")
 
-    with pytest.raises(EmmaEmailError, match="unexpected sender"):
-        parse_emma_email(spoofed)
+    with pytest.raises(NoticeEmailError, match="unexpected sender"):
+        parse_notice(spoofed, maryland())
 
 
 def test_plain_text_only_message_still_parses():
@@ -103,10 +110,10 @@ def test_plain_text_only_message_still_parses():
         b"Content-Type: text/plain; charset=utf-8\r\n\r\n" + plain.encode()
     )
 
-    notice = parse_emma_email(rebuilt)
+    notice = parse_notice(rebuilt, maryland())
 
-    assert notice.bpm_id == "58348"
-    assert notice.end_date == "8/14/2026"
+    assert notice.external_id == "58348"
+    assert notice.due_date == "8/14/2026"
     assert notice.link == ""
 
 
@@ -136,7 +143,7 @@ def test_record_key_is_stable_across_rounds_but_fingerprint_changes():
 
 def test_a_rotating_link_token_does_not_look_like_a_change():
     notice = load("01-educational-materials.eml")
-    resent = EmmaNotice(**{**notice.to_dict(), "link": notice.link + "&sid=999"})
+    resent = Notice(**{**notice.to_dict(), "link": notice.link + "&sid=999"})
 
     assert notice.to_opportunity().fingerprint == resent.to_opportunity().fingerprint
 
@@ -177,7 +184,7 @@ def test_processed_email_ledger_round_trips(tmp_path):
 def test_forward_carries_the_reason_and_the_original_attachment(matcher):
     raw = (FIXTURES / "04-executive-search.eml").read_bytes()
     original = BytesParser(policy=policy.default).parsebytes(raw)
-    notice = parse_emma_email(original)
+    notice = parse_notice(original, maryland())
     match = matcher.match(notice.to_opportunity())
 
     forward = build_forward(
@@ -192,6 +199,6 @@ def test_forward_carries_the_reason_and_the_original_attachment(matcher):
     )
     assert forward["To"] == "ks973111@gmail.com"
     assert 'Priority 1: "executive search"' in body
-    assert "BPM ID: 59001" in body
+    assert "ID: 59001" in body
     assert notice.link in body
     assert [item.get_content_type() for item in attachments] == ["message/rfc822"]

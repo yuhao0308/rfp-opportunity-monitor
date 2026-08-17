@@ -10,7 +10,8 @@ Alabama uses its own small adapter for the state search form.
 
 There are two ways in: `scan` crawls the public portals, and `email-scan` reads the
 vendor-registration inbox for portals that notify by email. Both feed the same keyword
-framework and the same SQLite state.
+framework and the same SQLite state. Email sources are defined entirely in
+`config.toml`, so adding one does not touch the code.
 
 ## What it does
 
@@ -143,7 +144,6 @@ IMAP_PASSWORD="xxxx xxxx xxxx xxxx"
 
 ```toml
 [email]
-senders = ["no-reply.emma@maryland.gov"]
 forward_to = ["you@gmail.com"]
 since_days = 7
 
@@ -152,6 +152,9 @@ hour = 7
 minute = 0
 forward = true
 ```
+
+Which portals to read is a separate list further down the same file — see
+[Adding another portal](#adding-another-portal). Maryland is already there.
 
 Then turn the job on:
 
@@ -200,6 +203,40 @@ scripts/schedule_email_scan.py uninstall
 - **Links are never opened**, just passed along for you to click.
 - **Most emails won't match, and that's fine.** The keyword list is tuned for
   executive search, so roofing and road work get skipped.
+
+### Adding another portal
+
+Nothing in the code knows about Maryland. Each portal is an `[[email_sources]]`
+block in `config.toml`, so adding one is a config change — copy the Maryland
+block and change the values.
+
+```toml
+[[email_sources]]
+id = "south-dakota-email"
+name = "South Dakota (email)"
+state = "SD"
+senders = ["noreply@state.sd.us"]
+subject_pattern = 'bid\s+opportunity\s*:\s*(?P<title>.+)'
+link_text = "View Solicitation"
+
+[email_sources.fields]
+title = "Solicitation Title"
+external_id = "Solicitation Number"
+due_date = "Closing Date"
+```
+
+You need three things from a sample email: who it comes from, what the subject
+looks like, and the label sitting in front of each field. Fields you leave out
+just aren't read. Everything after that — the keyword matching, forwarding,
+duplicate checks and the daily run — is already shared.
+
+Each source keeps its own history, so one portal's mail can never mask
+another's. Anything no source recognises is logged rather than dropped, and a
+mistake in a source entry is reported when the config loads rather than at 7am.
+
+This works when the notice puts each field after a label, which is the usual
+shape. A portal that formats things completely differently would still need
+code.
 
 ### What it has to work with
 

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import re
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .models import SourceConfig
@@ -39,6 +40,59 @@ class EmailConfig:
     max_messages: int = 200
 
 
+NOTICE_FIELDS = (
+    "title",
+    "external_id",
+    "category",
+    "lot",
+    "round_number",
+    "due_date",
+    "requester",
+)
+
+
+@dataclass(frozen=True)
+class EmailSourceConfig:
+    """How to recognise and read one portal's notification email.
+
+    Everything portal-specific lives here, so a new source is a config entry
+    rather than a new parser: who it comes from, how its subject reads, and
+    which label sits in front of each field in the body.
+    """
+
+    id: str
+    name: str
+    subject_pattern: str
+    fields: dict[str, str] = field(default_factory=dict)
+    state: str = ""
+    senders: tuple[str, ...] = ()
+    sender_domains: tuple[str, ...] = ()
+    browse_url: str = ""
+    link_text: str = "Link"
+    link_hosts: tuple[str, ...] = ()
+    uninformative: tuple[str, ...] = ("undefined", "n/a", "none", "other")
+    enabled: bool = True
+
+    def __post_init__(self) -> None:
+        unknown = sorted(set(self.fields) - set(NOTICE_FIELDS))
+        if unknown:
+            raise ValueError(
+                f"email source {self.id!r} maps unknown field(s) {', '.join(unknown)}; "
+                f"allowed: {', '.join(NOTICE_FIELDS)}"
+            )
+        if not self.senders and not self.sender_domains:
+            raise ValueError(f"email source {self.id!r} needs senders or sender_domains")
+        try:
+            compiled = re.compile(self.subject_pattern, re.IGNORECASE)
+        except re.error as exc:
+            raise ValueError(f"email source {self.id!r} has an invalid subject_pattern: {exc}")
+        if "title" not in self.fields and "title" not in compiled.groupindex:
+            raise ValueError(
+                f"email source {self.id!r} needs a 'title' field mapping or a "
+                "(?P<title>...) group in subject_pattern"
+            )
+
+
 @dataclass(frozen=True)
 class ScheduleConfig:
     """When the unattended email-scan runs, in the machine's local time."""
@@ -65,6 +119,11 @@ class AppConfig:
     sources: tuple[SourceConfig, ...]
     email: EmailConfig = EmailConfig()
     schedule: ScheduleConfig = ScheduleConfig()
+    email_sources: tuple[EmailSourceConfig, ...] = ()
+
+    @property
+    def enabled_email_sources(self) -> tuple[EmailSourceConfig, ...]:
+        return tuple(source for source in self.email_sources if source.enabled)
 
 
 def _resolve(base: Path, raw: str | None) -> Path | None:
@@ -120,6 +179,29 @@ def load_config(path: str | Path) -> AppConfig:
         max_messages=int(email_data.get("max_messages", 200)),
     )
 
+    email_sources = tuple(
+        EmailSourceConfig(
+            id=str(entry["id"]),
+            name=str(entry.get("name", entry["id"])),
+            subject_pattern=str(entry["subject_pattern"]),
+            fields={str(key): str(value) for key, value in entry.get("fields", {}).items()},
+            state=str(entry.get("state", "")),
+            senders=tuple(entry.get("senders", ())),
+            sender_domains=tuple(entry.get("sender_domains", ())),
+            browse_url=str(entry.get("browse_url", "")),
+            link_text=str(entry.get("link_text", "Link")),
+            link_hosts=tuple(entry.get("link_hosts", ())),
+            uninformative=tuple(
+                entry.get("uninformative", ("undefined", "n/a", "none", "other"))
+            ),
+            enabled=bool(entry.get("enabled", True)),
+        )
+        for entry in data.get("email_sources", [])
+    )
+    ids = [source.id for source in email_sources]
+    if len(ids) != len(set(ids)):
+        raise ValueError("Email source IDs must be unique")
+
     schedule_data = data.get("schedule", {})
     schedule = ScheduleConfig(
         hour=int(schedule_data.get("hour", 7)),
@@ -139,4 +221,5 @@ def load_config(path: str | Path) -> AppConfig:
         sources=sources,
         email=email,
         schedule=schedule,
+        email_sources=email_sources,
     )

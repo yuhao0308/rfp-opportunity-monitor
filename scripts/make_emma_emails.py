@@ -8,7 +8,7 @@ renders it into the same multipart/alternative notice the portal mails out.
     python scripts/make_emma_emails.py examples/emma_solicitations.json \
         --out tests/fixtures/emails/generated
 
-Every generated file is parsed back with rfp_monitor.emma_email before it is
+Every generated file is parsed back with rfp_monitor.notice_email before it is
 written, so a record that would produce an unparseable notice fails loudly here
 rather than silently weakening a test.
 """
@@ -28,12 +28,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from rfp_monitor.emma_email import parse_emma_email
+from rfp_monitor.config import load_config
+from rfp_monitor.notice_email import parse_notice
 
 SENDER = "eMaryland Marketplace Advantage (eMMA) <no-reply.emma@maryland.gov>"
 DEFAULT_RECIPIENT = "WANG Yuhao <ks973111@gmail.com>"
 DEFAULT_GREETING_NAME = "Yuhao Wang"
 VIEW_URL = "https://emma.maryland.gov/page.aspx/en/rfp/request_view"
+SOURCE_ID = "maryland-emma-email"
 NOTIFICATIONS_URL = "https://emma.maryland.gov/page.aspx/en/usr/notifications"
 EASTERN = timezone(timedelta(hours=-4))  # eMMA stamps its mail in local time.
 
@@ -286,15 +288,24 @@ def build_message(notice: Notice) -> EmailMessage:
     return message
 
 
-def _verify(raw: bytes, notice: Notice) -> None:
-    parsed = parse_emma_email(raw)
+def _source(config_path: Path):
+    """The Maryland email source, read from config like the monitor reads it."""
+
+    for source in load_config(config_path).email_sources:
+        if source.id == SOURCE_ID:
+            return source
+    raise RecordError(f"no [[email_sources]] entry with id = {SOURCE_ID!r}")
+
+
+def _verify(raw: bytes, notice: Notice, source) -> None:
+    parsed = parse_notice(raw, source)
     expected = {
-        "rfx_name": notice.title,
-        "bpm_id": notice.bpm_id,
-        "commodity": notice.main_category,
+        "title": notice.title,
+        "external_id": notice.bpm_id,
+        "category": notice.main_category,
         "lot": notice.lot,
         "round_number": notice.round_number,
-        "end_date": notice.due_date,
+        "due_date": notice.due_date,
         "requester": notice.buyer,
         "link": notice.link,
     }
@@ -322,6 +333,7 @@ def load_records(path: Path) -> list[dict]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("records", type=Path, help="JSON file of solicitation records")
+    parser.add_argument("--config", type=Path, default=ROOT / "config.toml")
     parser.add_argument(
         "--out",
         type=Path,
@@ -347,6 +359,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
+    try:
+        source = _source(args.config)
+    except (RecordError, OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
     now = datetime.now(EASTERN).replace(microsecond=0)
     built: list[tuple[Notice, bytes]] = []
     for index, record in enumerate(records):
@@ -354,7 +372,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             notice = Notice.from_record(record, default_sent_at=default_sent_at)
             raw = build_message(notice).as_bytes()
-            _verify(raw, notice)
+            _verify(raw, notice, source)
         except RecordError as exc:
             print(f"error: record {index + 1}: {exc}", file=sys.stderr)
             return 1
